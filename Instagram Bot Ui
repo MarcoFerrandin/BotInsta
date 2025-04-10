@@ -1,0 +1,93 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
+
+export default function InstagramBotUI() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [links, setLinks] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setStatus("Enviando para o bot...");
+
+    try {
+      const response = await fetch("https://instagram-bot-api.onrender.com/start_bot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          links: links.split("\n").map((link) => link.trim()).filter((link) => link !== ""),
+        }),
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!response.ok) {
+        let errorMsg = "Erro ao enviar os dados para o servidor";
+        if (contentType && contentType.includes("application/json")) {
+          const data = await response.json();
+          errorMsg = data?.message || errorMsg;
+        } else {
+          const text = await response.text();
+          errorMsg = text || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+      setStatus(data?.message || "Bot iniciado com sucesso.");
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      setStatus(error.message || "Erro ao conectar com o servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <Card className="max-w-xl w-full shadow-xl">
+        <CardContent className="p-6 space-y-4">
+          <h1 className="text-2xl font-bold text-center">Bot de Comentários do Instagram</h1>
+
+          <Input
+            placeholder="Usuário"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <Input
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Textarea
+            placeholder="Cole os links dos posts (1 por linha)"
+            rows={5}
+            value={links}
+            onChange={(e) => setLinks(e.target.value)}
+          />
+
+          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
+            {loading ? <Loader2 className="animate-spin mr-2" /> : null}
+            Iniciar Bot
+          </Button>
+
+          {status && (
+            <div className="text-sm text-center text-gray-600 mt-2">
+              {status}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
