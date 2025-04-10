@@ -1,0 +1,66 @@
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from pydantic import BaseModel
+from instagrapi import Client
+from typing import List
+import random
+import time
+import asyncio
+
+app = FastAPI()
+
+# Armazena sessões dos usuários
+sessions = {}
+
+# Comentários possíveis
+comentarios_padrao = [
+    "med unioeste",
+    "fag fraca",
+    "\U0001F40D\U0001F49B\U0001F5A4",
+    "aaamjhan foda",
+    "med unioeste",
+]
+
+class CommentRequest(BaseModel):
+    username: str
+    password: str
+    links: List[str]
+
+
+def comentar_periodicamente(username: str, links: List[str]):
+    client = sessions.get(username)
+    if not client:
+        print(f"\u274c Sessão do {username} não encontrada")
+        return
+
+    async def loop_comentarios():
+        while True:
+            print(f"\u23f3 Iniciando ciclo de comentários para {username}...")
+            for link in links:
+                try:
+                    shortcode = link.rstrip('/').split('/')[-1]
+                    comentario = random.choice(comentarios_padrao)
+                    client.comment(media_id=client.media_id(shortcode), text=comentario)
+                    print(f"\ud83d\udcac {username} comentou '{comentario}' em {link}")
+                    await asyncio.sleep(random.randint(4, 8))
+                except Exception as e:
+                    print(f"\u26a0\ufe0f Erro comentando em {link}: {e}")
+                    continue
+            print(f"\ud83d\udecc Aguardando 10 minutos...")
+            await asyncio.sleep(600)
+
+    asyncio.create_task(loop_comentarios())
+
+
+@app.post("/iniciar")
+async def iniciar_bot(req: CommentRequest, background_tasks: BackgroundTasks):
+    if req.username not in sessions:
+        try:
+            client = Client()
+            client.login(req.username, req.password)
+            sessions[req.username] = client
+            print(f"\u2705 Login realizado com sucesso: {req.username}")
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Erro no login: {str(e)}")
+
+    background_tasks.add_task(comentar_periodicamente, req.username, req.links)
+    return {"status": "Bot iniciado e comentando a cada 10 minutos."}
